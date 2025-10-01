@@ -17,14 +17,14 @@ function createWindow() {
     },
   });
 
-  mainWindow.loadURL("http://localhost:5173");
+  mainWindow.loadURL("../dist/index.html");
   mainWindow.webContents.openDevTools();
 }
 
 // Чекаємо, поки Electron готовий
 app.whenReady().then(async () => {
   // Чекаємо Vite dev server
-  await waitOn({ resources: ["http://localhost:5173"], timeout: 30000 });
+  await waitOn({ resources: ["../dist/index.html"], timeout: 30000 });
   createWindow();
 });
 
