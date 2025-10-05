@@ -13,18 +13,35 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      webSecurity: false, // Allow external requests
+      allowRunningInsecureContent: true,
       preload: path.join(__dirname, "preload.js")
     },
   });
 
-  mainWindow.loadURL("../dist/index.html");
+  // Set user agent to avoid CORS issues
+  mainWindow.webContents.setUserAgent('MinerApp/1.0');
+
+  // Load from Vite dev server in development
+  const isDev = process.env.NODE_ENV !== 'production';
+  if (isDev) {
+    mainWindow.loadURL("http://localhost:5174");
+  } else {
+    mainWindow.loadFile(path.join(__dirname, "../dist/index.html"));
+  }
+  
   mainWindow.webContents.openDevTools();
 }
 
 // Чекаємо, поки Electron готовий
 app.whenReady().then(async () => {
-  // Чекаємо Vite dev server
-  await waitOn({ resources: ["../dist/index.html"], timeout: 30000 });
+  const isDev = process.env.NODE_ENV !== 'production';
+  
+  if (isDev) {
+    // Wait for Vite dev server
+    await waitOn({ resources: ["http://localhost:5174"], timeout: 30000 });
+  }
+  
   createWindow();
 });
 
@@ -53,6 +70,35 @@ ipcMain.handle("stop-miner", () => {
     return "Miner stopped";
   }
   return "Miner not running";
+});
+
+// Add backend connection test using http module
+ipcMain.handle("test-backend", async () => {
+  const http = require('http');
+  
+  return new Promise((resolve) => {
+    const req = http.get('http://localhost:3001/health', (res) => {
+      let data = '';
+      res.on('data', (chunk) => data += chunk);
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          resolve({ success: true, data: parsed });
+        } catch (e) {
+          resolve({ success: false, error: 'Invalid JSON response' });
+        }
+      });
+    });
+    
+    req.on('error', (error) => {
+      resolve({ success: false, error: error.message });
+    });
+    
+    req.setTimeout(5000, () => {
+      req.destroy();
+      resolve({ success: false, error: 'Connection timeout' });
+    });
+  });
 });
 
 // Закриваємо всі вікна
